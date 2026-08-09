@@ -165,7 +165,7 @@ func (repo *testRepository) GetCurrent(context.Context, TrustDomainRef, ChannelR
 	return repo.current.Clone(), nil
 }
 
-func (repo *testRepository) CompareAndSwapCurrent(_ context.Context, _ TrustDomainRef, _ ChannelRef, expected *EnvelopeRef, next Envelope) error {
+func (repo *testRepository) CompareAndSwapCurrent(_ context.Context, _ TrustDomainRef, _ ChannelRef, expected *CurrentState, next Envelope) error {
 	if repo.casErr != nil {
 		return repo.casErr
 	}
@@ -173,12 +173,51 @@ func (repo *testRepository) CompareAndSwapCurrent(_ context.Context, _ TrustDoma
 		if expected != nil {
 			return ErrConflict
 		}
-	} else if expected == nil || *expected != repo.current.EnvelopeRef {
+	} else if expected == nil || expected.ChannelEpoch != repo.current.ChannelEpoch || expected.Revision != repo.current.Revision || expected.EnvelopeRef != repo.current.EnvelopeRef {
 		return ErrConflict
 	}
 	copy := next.Clone()
 	repo.current = &copy
 	return nil
+}
+
+func TestRepositoryCASRequiresCompleteExpectedState(t *testing.T) {
+	trust, channel, first, second, _ := mustRefs(t)
+	repo := &testRepository{current: func() *Envelope {
+		current := NewEnvelope(1, 2, 3, first, nil, []byte("current"))
+		return &current
+	}()}
+	next := NewEnvelope(1, 2, 4, second, &first, []byte("next"))
+	tests := []struct {
+		name     string
+		expected *CurrentState
+	}{
+		{"expected absence", nil},
+		{"epoch mismatch", &CurrentState{ChannelEpoch: 1, Revision: 3, EnvelopeRef: first}},
+		{"revision mismatch", &CurrentState{ChannelEpoch: 2, Revision: 2, EnvelopeRef: first}},
+		{"reference mismatch", &CurrentState{ChannelEpoch: 2, Revision: 3, EnvelopeRef: second}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := repo.CompareAndSwapCurrent(context.Background(), trust, channel, test.expected, next); !errors.Is(err, ErrConflict) {
+				t.Fatalf("CAS error = %v", err)
+			}
+		})
+	}
+}
+
+func TestServicePassesReadCurrentStateToCAS(t *testing.T) {
+	trust, channel, first, second, _ := mustRefs(t)
+	current := NewEnvelope(1, 2, 3, first, nil, []byte("current"))
+	repo := &testRepository{current: &current}
+	service := NewService(repo, 100)
+	next := NewEnvelope(1, 2, 4, second, &first, []byte("next"))
+	if _, err := service.PutCurrent(context.Background(), OperationContext{CanPublish: true}, trust, channel, next); err != nil {
+		t.Fatal(err)
+	}
+	if repo.current == nil || repo.current.EnvelopeRef != second || repo.current.Revision != 4 {
+		t.Fatalf("replacement was not accepted: %#v", repo.current)
+	}
 }
 
 func testService(t *testing.T, limit int) (*Service, *testRepository, TrustDomainRef, ChannelRef, EnvelopeRef, EnvelopeRef) {

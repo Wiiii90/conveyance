@@ -12,9 +12,15 @@ type OperationContext struct {
 	CanPublish bool
 }
 
+type CurrentState struct {
+	ChannelEpoch uint64
+	Revision     uint64
+	EnvelopeRef  EnvelopeRef
+}
+
 type CurrentObjectRepository interface {
 	GetCurrent(context.Context, TrustDomainRef, ChannelRef) (Envelope, error)
-	CompareAndSwapCurrent(context.Context, TrustDomainRef, ChannelRef, *EnvelopeRef, Envelope) error
+	CompareAndSwapCurrent(context.Context, TrustDomainRef, ChannelRef, *CurrentState, Envelope) error
 }
 
 type PutResult struct {
@@ -57,7 +63,7 @@ func (service *Service) PutCurrent(ctx context.Context, operation OperationConte
 	}
 
 	current, err := service.repository.GetCurrent(ctx, trustDomainRef, channelRef)
-	expected := (*EnvelopeRef)(nil)
+	var expected *CurrentState
 	created := errors.Is(err, ErrCurrentObjectNotFound)
 	if err != nil && !created {
 		return PutResult{}, err
@@ -65,7 +71,11 @@ func (service *Service) PutCurrent(ctx context.Context, operation OperationConte
 	channel := NewChannel(trustDomainRef, channelRef)
 	if !created {
 		channel.current = &current
-		expected = &current.EnvelopeRef
+		expected = &CurrentState{
+			ChannelEpoch: current.ChannelEpoch,
+			Revision:     current.Revision,
+			EnvelopeRef:  current.EnvelopeRef,
+		}
 	}
 	if err := channel.Publish(envelope); err != nil {
 		return PutResult{}, err
