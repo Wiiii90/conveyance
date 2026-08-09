@@ -20,6 +20,11 @@ Go 1.26 includes the RFC 9180 `crypto/hpke` standard-library package. This makes
 
 Exact Go package layout remains an implementation decision. Issue #4 selects and documents the minimal durable persistence technology consistent with the frozen Current Object contract; it must stop if that selection requires a new architecture decision.
 
+For v0.1.0, server persistence is SQLite through `database/sql` using
+`modernc.org/sqlite`. This is a small single-node durable Current Object store,
+and the driver avoids CGO. The database is Conveyance-owned only: there is no
+shared database, ORM, or migration framework in v0.1.0.
+
 ## v0.1.0 Current Object boundary
 
 v0.1.0 exposes only:

@@ -24,10 +24,16 @@ v0.1.0 is sequenced through these work packages:
    restart durability, no product-visible history, and persistence integration
    tests. Stop if technology selection requires an unaccepted architecture
    decision.
+
 5. Issue #5, HTTP API: the two versioned Current Object endpoints, frozen JSON
    and generic error mapping, decoded payload-size enforcement,
    application/persistence integration, local/test authorization adapter, and
    HTTP/integration tests.
+
+Issue #4 selects SQLite through `database/sql` with `modernc.org/sqlite` for
+the v0.1.0 server. It is a small single-node durable Current Object store, and
+the driver avoids CGO. Persistence is Conveyance-owned only; there is no shared
+database, ORM, or migration framework in v0.1.0.
 
 v0.1.0 implements no production authentication or cryptography. It has no
 separate Channel-create endpoint: first publish atomically establishes the
