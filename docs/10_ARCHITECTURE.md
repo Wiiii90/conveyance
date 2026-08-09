@@ -18,7 +18,48 @@ Preferred server stack:
 
 Go 1.26 includes the RFC 9180 `crypto/hpke` standard-library package. This makes HPKE straightforward on the Conveyance/Go side, but the server normally stores opaque Key Grants rather than decrypting foreign business payloads.
 
-Exact Go package layout and database technology are implementation decisions after the contracts are finalized.
+Exact Go package layout remains an implementation decision. Issue #4 selects and documents the minimal durable persistence technology consistent with the frozen Current Object contract; it must stop if that selection requires a new architecture decision.
+
+## v0.1.0 Current Object boundary
+
+v0.1.0 exposes only:
+
+- `GET /v1/trust-domains/{trust_domain_ref}/channels/{channel_ref}/current`;
+- `PUT /v1/trust-domains/{trust_domain_ref}/channels/{channel_ref}/current`.
+
+There is no separate Channel-create endpoint. The first valid PUT atomically
+establishes the `current_object` Channel and its current Envelope. Trust
+Domain, Channel, and Envelope references use canonical UUID text and remain
+semantically opaque.
+
+The Current Object JSON body carries Envelope format version, epoch, revision,
+Envelope reference, nullable-on-first-publish previous Envelope reference, and
+base64-encoded opaque protected payload. Trust Domain and Channel references
+come from the route and are not duplicated in the body.
+
+Only the current Envelope is product-readable. No history, list, version, or
+ordered-delivery endpoint exists in V1.
+
+## Current Object consistency boundary
+
+First publish, same-epoch replacement, and epoch advance follow the exact
+transition rules frozen in ADR-0003 and `docs/08_CONTRACTS.md`. Expected-current
+validation and replacement must be one atomic persistence compare-and-swap.
+A stale concurrent writer receives Conflict; last-write-wins is not permitted.
+
+The protected payload remains opaque. Its configured technical size limit is
+checked on decoded bytes and defaults to 8 MiB in v0.1.0.
+
+## v0.1.0 authorization seam
+
+The transport boundary supplies application operations with an
+already-authorized operation context/principal carrying generic `read` or
+`publish` permission. An explicitly local/test adapter may exercise these
+permission paths in Issue #5.
+
+This seam is not an authentication protocol. v0.1.0 defines no mTLS, token,
+API-key, custom-signature, enrollment, or recovery mechanism. Production
+authentication remains gated security-milestone work.
 
 ## Security layers
 

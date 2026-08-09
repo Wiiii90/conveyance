@@ -1,60 +1,98 @@
 # 07 -- Application Design
 
-## V1 use cases
+## v0.1.0 operation boundary
 
-### Register/maintain authenticated installation state
+The Current Object core exposes application operations independent of HTTP
+and persistence implementation details. Each operation receives:
 
-Maintain server-side public credential/status records required to
-authenticate already-authorized installations.
+- opaque `trust_domain_ref` and `channel_ref` values;
+- an already-authorized operation context/principal supplied by the transport
+  boundary;
+- the operation-specific input.
 
-This is not permission for the server to create trust unilaterally.
+The context carries only the generic permission needed by the operation:
+`read` or `publish`. It does not carry or validate mTLS credentials, tokens,
+API keys, enrollment proofs, Channel Keys, or Recovery Material.
 
-### Create/configure Channel
+Issue #5 may provide an explicitly local/test adapter that supplies this
+context so permission paths can be exercised. Production authentication is
+security-milestone work.
 
-Create an opaque Channel in a Trust Domain with V1 delivery mode
-`current_object`.
+## Retrieve Current Object
 
-### Grant Channel access
+Input:
 
-Associate an active installation with generic `read` and/or `publish`
-permission.
+- route identity `(trust_domain_ref, channel_ref)`;
+- an operation context with `read` permission.
 
-### Store Key Grant
+Behavior:
 
-Persist opaque protected Channel-key material for an installation.
+1. enforce the generic `read` permission;
+2. retrieve the current Envelope for the route identity;
+3. return the exact opaque Envelope, or Current Object Not Found when none
+   exists.
 
-### Publish Current Object
+No history or foreign payload projection is available.
 
-Input includes: - Channel identity; - expected current state; -
-epoch/revision; - immutable Envelope; - protected payload.
+## Publish Current Object
 
-Behavior: - authenticate installation; - authorize `publish`; - validate
-Conveyance envelope structure/version/limits; - enforce epoch/revision
-and compare-and-swap invariants; - atomically replace current Envelope.
+Input:
 
-### Retrieve Current Object
+- route identity `(trust_domain_ref, channel_ref)`;
+- an operation context with `publish` permission;
+- an immutable Envelope containing format version, epoch, revision, Envelope
+  references, and opaque protected payload.
 
-Behavior: - authenticate installation; - authorize `read`; - return
-current opaque Envelope or explicit absence.
+Behavior:
 
-### Revoke Installation
+1. enforce the generic `publish` permission;
+2. validate reference and Envelope structure;
+3. reject unsupported Envelope format versions explicitly;
+4. enforce the configured decoded-payload limit, whose v0.1.0 default is
+   8 MiB;
+5. atomically validate first-publish or replacement ordering against the
+   current state and install the replacement;
+6. report whether the result was a first publish or replacement.
 
-Reject future authenticated operations for the revoked installation.
+There is no separate Channel-create operation. A valid first publish creates
+the `current_object` Channel and current Envelope in the same atomic
+persistence operation.
 
-Client-controlled rekey creates fresh Channel epochs/keys. Conveyance
-never derives or re-encrypts business payloads.
+## Transition rules
 
-### Recovery-package storage
+- First publish: epoch 1, revision 1, null previous Envelope reference.
+- Same-epoch replacement: unchanged epoch, next consecutive revision, and
+  previous Envelope reference equal to the current Envelope reference.
+- Epoch advance: next consecutive epoch, revision 1, and previous Envelope
+  reference equal to the current Envelope reference.
 
-Store/retrieve one opaque current recovery package for the Trust Domain.
-Its plaintext and recovery secret are never available to Conveyance.
+All decreasing/skipped epochs, invalid revision transitions, missing or stale
+expected-current references, and null previous references after first publish
+produce Conflict. Structurally malformed inputs produce Invalid Envelope.
 
-## Transaction boundary
+## Persistence port and transaction boundary
 
-Current Object replacement must be atomic with its expected-current
-check.
+The application persistence port must make expected-current validation and
+replacement one atomic compare-and-swap operation. It must distinguish:
 
-## Idempotency
+- first publish accepted;
+- replacement accepted;
+- conflict because current state did not match;
+- current object absent on read;
+- storage unavailable.
 
-Exact API idempotency semantics are deferred to contract design, but
-duplicate retries must not silently create divergent revisions.
+The persistence technology is selected in Issue #4. Selection must not alter
+these semantics or expose product-visible history.
+
+## Retry behavior
+
+Every PUT is a compare-and-swap attempt. Replaying a request after its first
+successful application finds a different current state and returns Conflict;
+the caller retrieves current state to reconcile. A retry never silently
+creates a divergent revision and no last-write-wins path exists.
+
+## Deferred operations
+
+Production installation authentication, Channel grants, Key Grants,
+revocation, recovery-package storage, and cryptographic processing remain
+outside v0.1.0. Ordered delivery is also deferred.
