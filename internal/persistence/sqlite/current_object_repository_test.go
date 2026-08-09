@@ -3,6 +3,8 @@ package sqlite
 import (
 	"context"
 	"errors"
+	"math"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -10,7 +12,7 @@ import (
 )
 
 func TestRepositoryPersistsCurrentObjectAndIsIdempotent(t *testing.T) {
-	path := t.TempDir() + "\\current-object.db"
+	path := filepath.Join(t.TempDir(), "current-object.db")
 	repository := openTestRepository(t, path)
 	trust, channel := testRoute(t)
 	envelope := testEnvelope(t, 1, 1, "00000000-0000-0000-0000-000000000003", nil, []byte{0, 1, 255})
@@ -29,7 +31,7 @@ func TestRepositoryPersistsCurrentObjectAndIsIdempotent(t *testing.T) {
 }
 
 func TestRepositoryReplacesCurrentObjectByEpochAndRevision(t *testing.T) {
-	repository := openTestRepository(t, t.TempDir()+"\\current-object.db")
+	repository := openTestRepository(t, filepath.Join(t.TempDir(), "current-object.db"))
 	trust, channel := testRoute(t)
 	first := testEnvelope(t, 1, 1, "00000000-0000-0000-0000-000000000003", nil, []byte("first"))
 	second := testEnvelope(t, 1, 2, "00000000-0000-0000-0000-000000000004", &first.EnvelopeRef, []byte("second"))
@@ -47,7 +49,7 @@ func TestRepositoryReplacesCurrentObjectByEpochAndRevision(t *testing.T) {
 }
 
 func TestRepositoryCASConflictsOnExistingOrStaleExpectedState(t *testing.T) {
-	repository := openTestRepository(t, t.TempDir()+"\\current-object.db")
+	repository := openTestRepository(t, filepath.Join(t.TempDir(), "current-object.db"))
 	trust, channel := testRoute(t)
 	first := testEnvelope(t, 1, 1, "00000000-0000-0000-0000-000000000003", nil, []byte("first"))
 	second := testEnvelope(t, 1, 2, "00000000-0000-0000-0000-000000000004", &first.EnvelopeRef, []byte("second"))
@@ -71,7 +73,7 @@ func TestRepositoryCASConflictsOnExistingOrStaleExpectedState(t *testing.T) {
 }
 
 func TestRepositoryConcurrentCASHasOneWinnerAndNoHistory(t *testing.T) {
-	repository := openTestRepository(t, t.TempDir()+"\\current-object.db")
+	repository := openTestRepository(t, filepath.Join(t.TempDir(), "current-object.db"))
 	trust, channel := testRoute(t)
 	first := testEnvelope(t, 1, 1, "00000000-0000-0000-0000-000000000003", nil, []byte("first"))
 	left := testEnvelope(t, 1, 2, "00000000-0000-0000-0000-000000000004", &first.EnvelopeRef, []byte("left"))
@@ -109,6 +111,23 @@ func TestRepositoryConcurrentCASHasOneWinnerAndNoHistory(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("current object rows = %d, want 1", count)
 	}
+}
+
+func TestRepositoryRoundTripsUint64ValuesAcrossSQLiteIntegerSignBit(t *testing.T) {
+	repository := openTestRepository(t, filepath.Join(t.TempDir(), "current-object.db"))
+	trust, channel := testRoute(t)
+	wanted := currentobject.NewEnvelope(math.MaxUint64, math.MaxUint64, math.MaxUint64, testRef(t, "00000000-0000-0000-0000-000000000003"), nil, []byte("opaque"))
+	if err := repository.CompareAndSwapCurrent(context.Background(), trust, channel, nil, wanted); err != nil {
+		t.Fatal(err)
+	}
+	assertEnvelopeEqual(t, wanted, getTestCurrent(t, repository, trust, channel))
+
+	next := currentobject.NewEnvelope(math.MaxUint64, 1, 1, testRef(t, "00000000-0000-0000-0000-000000000004"), nil, []byte("next"))
+	expected := &currentobject.CurrentState{ChannelEpoch: math.MaxUint64, Revision: math.MaxUint64, EnvelopeRef: wanted.EnvelopeRef}
+	if err := repository.CompareAndSwapCurrent(context.Background(), trust, channel, expected, next); err != nil {
+		t.Fatalf("CAS with above-MaxInt64 expected state error = %v", err)
+	}
+	assertEnvelopeEqual(t, next, getTestCurrent(t, repository, trust, channel))
 }
 
 func openTestRepository(t *testing.T, path string) *Repository {

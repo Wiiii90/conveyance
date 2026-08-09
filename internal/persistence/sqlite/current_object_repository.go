@@ -5,14 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/Wiiii90/conveyance/internal/currentobject"
 	_ "modernc.org/sqlite"
 )
-
-const maxSQLiteInteger = uint64(math.MaxInt64)
 
 type Repository struct {
 	db *sql.DB
@@ -70,13 +67,10 @@ func (repository *Repository) GetCurrent(ctx context.Context, trustDomainRef cur
 	if err != nil {
 		return currentobject.Envelope{}, unavailable("decode current object", err)
 	}
-	return currentobject.NewEnvelope(uint64(formatVersion), uint64(epoch), uint64(revision), ref, previous, payload), nil
+	return currentobject.NewEnvelope(decodeUint64(formatVersion), decodeUint64(epoch), decodeUint64(revision), ref, previous, payload), nil
 }
 
 func (repository *Repository) CompareAndSwapCurrent(ctx context.Context, trustDomainRef currentobject.TrustDomainRef, channelRef currentobject.ChannelRef, expected *currentobject.CurrentState, next currentobject.Envelope) error {
-	if err := validatePersistedNumbers(next); err != nil {
-		return err
-	}
 	tx, err := repository.db.BeginTx(ctx, nil)
 	if err != nil {
 		return unavailable("begin current object transaction", err)
@@ -89,8 +83,8 @@ func (repository *Repository) CompareAndSwapCurrent(ctx context.Context, trustDo
             (trust_domain_ref, channel_ref, envelope_format_version, channel_epoch,
              revision, envelope_ref, previous_envelope_ref, protected_payload)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			trustDomainRef.String(), channelRef.String(), int64(next.EnvelopeFormatVersion),
-			int64(next.ChannelEpoch), int64(next.Revision), next.EnvelopeRef.String(),
+			trustDomainRef.String(), channelRef.String(), encodeUint64(next.EnvelopeFormatVersion),
+			encodeUint64(next.ChannelEpoch), encodeUint64(next.Revision), next.EnvelopeRef.String(),
 			optionalEnvelopeRef(next.PreviousEnvelopeRef), append([]byte(nil), next.ProtectedPayload...))
 		if err != nil {
 			if isConstraintError(err) {
@@ -99,18 +93,15 @@ func (repository *Repository) CompareAndSwapCurrent(ctx context.Context, trustDo
 			return unavailable("insert current object", err)
 		}
 	} else {
-		if err := validatePersistedState(*expected); err != nil {
-			return err
-		}
 		result, err = tx.ExecContext(ctx, `UPDATE current_objects SET
             envelope_format_version = ?, channel_epoch = ?, revision = ?,
             envelope_ref = ?, previous_envelope_ref = ?, protected_payload = ?
             WHERE trust_domain_ref = ? AND channel_ref = ?
               AND channel_epoch = ? AND revision = ? AND envelope_ref = ?`,
-			int64(next.EnvelopeFormatVersion), int64(next.ChannelEpoch), int64(next.Revision),
+			encodeUint64(next.EnvelopeFormatVersion), encodeUint64(next.ChannelEpoch), encodeUint64(next.Revision),
 			next.EnvelopeRef.String(), optionalEnvelopeRef(next.PreviousEnvelopeRef),
 			append([]byte(nil), next.ProtectedPayload...), trustDomainRef.String(), channelRef.String(),
-			int64(expected.ChannelEpoch), int64(expected.Revision), expected.EnvelopeRef.String())
+			encodeUint64(expected.ChannelEpoch), encodeUint64(expected.Revision), expected.EnvelopeRef.String())
 		if err != nil {
 			return unavailable("update current object", err)
 		}
@@ -128,19 +119,11 @@ func (repository *Repository) CompareAndSwapCurrent(ctx context.Context, trustDo
 	return nil
 }
 
-func validatePersistedNumbers(envelope currentobject.Envelope) error {
-	if envelope.EnvelopeFormatVersion > maxSQLiteInteger || envelope.ChannelEpoch > maxSQLiteInteger || envelope.Revision > maxSQLiteInteger {
-		return fmt.Errorf("current object numeric value exceeds SQLite v0.1.0 range: %w", currentobject.ErrUnavailable)
-	}
-	return nil
-}
+// SQLite INTEGER is signed int64. Encoding by bit pattern preserves every
+// uint64 value for storage and equality comparison, including MaxUint64.
+func encodeUint64(value uint64) int64 { return int64(value) }
 
-func validatePersistedState(state currentobject.CurrentState) error {
-	if state.ChannelEpoch > maxSQLiteInteger || state.Revision > maxSQLiteInteger {
-		return fmt.Errorf("current object expected state exceeds SQLite v0.1.0 range: %w", currentobject.ErrUnavailable)
-	}
-	return nil
-}
+func decodeUint64(value int64) uint64 { return uint64(value) }
 
 func parseOptionalEnvelopeRef(value sql.NullString) (*currentobject.EnvelopeRef, error) {
 	if !value.Valid {
