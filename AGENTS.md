@@ -6,6 +6,23 @@ The canonical and only project name is **Conveyance**.
 
 Do not use “Relay Service” as the project name. Relay is a technical/domain role inside Conveyance.
 
+## Control plane and worktrees
+
+The canonical worktrees are:
+
+- `P:\conveyance` -> `main` -> stable release state;
+- `P:\conveyance\.worktrees\dev` -> `dev` -> active development.
+
+Implementation workers use `P:\conveyance\.worktrees\dev` unless explicitly instructed otherwise. The `main` worktree is not used for ordinary implementation. Release integration to `main` occurs only on explicit Control-Plane instruction.
+
+Before editing, workers verify the repository root, branch, and expected HEAD.
+
+Milestones are named only by release version: `v0.1.0`, `v0.2.0`, `v0.3.0`, and so on. GitHub Issues are durable work packages inside milestones. The Control Plane owns milestone scope, issue scope, sequencing, and parallelization. Workers do not create or expand milestones or issues unless explicitly instructed.
+
+Worker chats are persistent file/responsibility contexts, not individual issues. Their naming format is `<Area> #N`. Worker chats do not replace milestones or issues. Workers do not spawn subagents unless explicitly authorized.
+
+Worker prompts state the repository, worktree, branch, expected HEAD, issue, exact files, exact changes, non-goals, validations, and commit/push instructions.
+
 ## Source of truth
 
 Repository documentation and accepted ADRs are the durable source of truth.
