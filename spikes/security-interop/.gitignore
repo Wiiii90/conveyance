@@ -1,0 +1,15 @@
+bin/
+obj/
+artifacts/
+*.crt
+*.cer
+*.der
+*.key
+*.pem
+*.pfx
+*.p12
+*.db
+*.log
+*.tmp
+private*
+runtime-*

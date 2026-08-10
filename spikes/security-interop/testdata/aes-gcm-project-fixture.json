@@ -1,0 +1,7 @@
+{
+  "nonce": "oKGio6Slpqeoqaqr",
+  "ciphertext": "nToaRD2/d80HR73xZBWuqBXVOH7x0m8f\u002BW1T9BbfDCy7GDOa3U0jECmtJrU=",
+  "tag": "rG9A0yq3AsIzAvXMeaJyuw==",
+  "aad": "conveyance-current-object-envelope-v1\ntrust_domain_ref=00000000-0000-0000-0000-000000000101\nchannel_ref=00000000-0000-0000-0000-000000000102\nenvelope_format_version=1\nchannel_epoch=7\nrevision=11\nenvelope_ref=00000000-0000-0000-0000-000000000105\nprevious_envelope_ref=00000000-0000-0000-0000-000000000104",
+  "plaintext": "{\u0022fixture\u0022:\u0022conveyance-security-interop-v1\u0022}"
+}
