@@ -73,6 +73,20 @@ is explicitly rejected.
 
 ## .NET HPKE candidate audit
 
+### OpenSSL 3.5.7 native bridge candidate
+
+The official OpenSSL 3.5.7 source archive and published SHA-256 were
+verified. The public `openssl/hpke.h` header contains the frozen RFC 9180
+suite identifiers and the required context, key, encapsulation, seal/open,
+and suite-check operations. The x64 MSVC, nmake, and suitable Perl tools were
+available, but configuration stopped because NASM was not installed or
+discoverable. Candidate result: `BLOCKED-OPENSSL-BUILD-ENVIRONMENT`.
+
+No native library, C shim, .NET P/Invoke harness, RFC vector run, Go↔OpenSSL
+interop, or native tamper suite is claimed. The detailed provenance and
+static iOS audit are in `native/RESULTS.md`. This does not alter the prior
+AES or `BLOCKED-MTLS-WINDOWS-ENVIRONMENT` evidence.
+
 ### BouncyCastle.Cryptography 2.6.2
 
 - Source: official NuGet package and `bcgit/bc-csharp` source mirror.
