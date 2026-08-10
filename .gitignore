@@ -1,5 +1,6 @@
 /bin/
 /conveyance.db
+/.worktrees/
 *.exe
 *.test
 *.out
