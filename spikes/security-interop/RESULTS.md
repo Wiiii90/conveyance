@@ -2,6 +2,9 @@
 
 Run date: 2026-08-10
 
+Canonical repository: `wgt-system/conveyance`.
+Canonical spike Go module: `github.com/wgt-system/conveyance/spikes/security-interop/go`.
+
 This is empirical spike evidence only. It is not ADR-0007 `PASS`, not
 production-security approval, and does not prove the real-iPhone gate.
 
@@ -47,13 +50,23 @@ is explicitly rejected.
 - Certificate profile: self-signed test X.509 v3, SHA-256, Digital Signature,
   TLS Web Client Authentication EKU `1.3.6.1.5.5.7.3.2`; public certificate
   only is written to the run directory.
-- Result: `FAIL` in this sandbox before credential creation. The Windows CNG
-  call fails at `CngKey.Create` with
-  `CryptographicException: The system cannot find the file specified.`
-- Therefore persistence across process boundaries, TLS 1.3 negotiation,
-  registered success, unknown rejection, and InstallationRef mismatch could
-  not be executed here. The client code does not fall back to an exportable or
-  in-memory credential.
+- Diagnostic result: ephemeral ECDSA P-256 CNG creation and signing `PASS`.
+- Microsoft Software Key Storage Provider is the selected provider, but the
+  minimal uniquely named persisted CurrentUser key creation fails:
+  `System.Security.Cryptography.CryptographicException`, HRESULT
+  `0x80070002`, message `The system cannot find the file specified.`
+- The first failure is persisted minimal key creation. Persisted signing,
+  persisted `CngExportPolicies.None`, and separate-process reopen are
+  `NOT-RUN` because no persisted key exists. The diagnostic cleanup is
+  run-scoped and idempotent.
+- mTLS sub-gate: `BLOCKED-MTLS-WINDOWS-ENVIRONMENT`. This is host/store access
+  evidence, not an architectural mTLS failure. The client code does not fall
+  back to an exportable or in-memory credential.
+- Because persisted credential creation did not become executable, no-client,
+  registered, unknown-certificate, mismatched-InstallationRef, and negotiated
+  TLS 1.3 request cases are `NOT-RUN` in this environment. The harness now
+  contains all four request paths and will execute them if the diagnostic
+  prerequisite passes.
 - Server implementation is loopback-only, TLS 1.3-only, requires a client
   certificate, pins the test server SPKI in the client, and checks the explicit
   InstallationRef mapping. No trust-all callback or production CA is used.
@@ -88,11 +101,20 @@ output for the exact fixture:
 - exact canonical AAD and plaintext are emitted by the harness and committed
   in `testdata/aes-gcm-project-fixture.json`.
 
-Fixture equality: `PASS`. The Windows client independently uses
+Canonical fixture verification: `PASS`; ordinary runs never rewrite the
+committed fixture. The Windows client independently uses
 `System.Security.Cryptography.AesGcm`; the Go side uses `crypto/aes` and
 `cipher.NewGCM`. Go opened the Windows-produced fixture and Windows opened the
-Go-produced fixture: `PASS`. The complete Windows tamper suite remains
-pending the mTLS/HPKE executable client path.
+Go-produced fixture: `PASS`.
+
+AES stage: `AES-WINDOWS-INTEROP-PASS`.
+
+- Go canonical-AAD tamper suite: `10/10 PASS`.
+- Windows canonical-AAD tamper suite: `10/10 PASS`.
+- Mutations covered: Trust Domain, Channel, format version, epoch, revision,
+  Envelope reference, previous Envelope reference, nonce, ciphertext, and
+  tag. Every case failed authentication without accepted plaintext or partial
+  plaintext.
 
 ## Cleanup and validation
 
@@ -107,5 +129,9 @@ pending the mTLS/HPKE executable client path.
 - .NET spike `dotnet build`: `PASS`.
 - Vulnerability/dependency audit: not applicable; no third-party .NET package
   was used.
-- Production repository checks and final `git diff --check` remain to be run
-  after the spike artifacts are complete.
+- Root `go vet ./...`: `PASS`.
+- Root `go test ./...`: `PASS`.
+- Root normal `go build ./...`: known sandbox VCS-stamping failure only;
+  `go build -buildvcs=false ./...`: `PASS`.
+- Root `go mod verify`: `PASS`.
+- Root `git diff --check`: `PASS`.

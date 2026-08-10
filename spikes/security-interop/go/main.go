@@ -58,8 +58,18 @@ func grantAAD(g grant) []byte {
 	return []byte(fmt.Sprintf("conveyance-channel-key-grant-v1\ntrust_domain_ref=%s\nchannel_ref=%s\nchannel_epoch=%d\nrecipient_installation_ref=%s", g.TrustDomainRef, g.ChannelRef, g.ChannelEpoch, g.RecipientInstallationRef))
 }
 
-func envelopeAAD(previous string) []byte {
-	return []byte(fmt.Sprintf("conveyance-current-object-envelope-v1\ntrust_domain_ref=%s\nchannel_ref=%s\nenvelope_format_version=1\nchannel_epoch=7\nrevision=11\nenvelope_ref=00000000-0000-0000-0000-000000000105\nprevious_envelope_ref=%s", trustDomainRef, channelRef, previous))
+type envelopeFields struct {
+	TrustDomainRef, ChannelRef            string
+	FormatVersion, ChannelEpoch, Revision uint64
+	EnvelopeRef, PreviousEnvelopeRef      string
+}
+
+func canonicalEnvelopeAAD(f envelopeFields) []byte {
+	return []byte(fmt.Sprintf("conveyance-current-object-envelope-v1\ntrust_domain_ref=%s\nchannel_ref=%s\nenvelope_format_version=%d\nchannel_epoch=%d\nrevision=%d\nenvelope_ref=%s\nprevious_envelope_ref=%s", f.TrustDomainRef, f.ChannelRef, f.FormatVersion, f.ChannelEpoch, f.Revision, f.EnvelopeRef, f.PreviousEnvelopeRef))
+}
+
+func fixtureFields() envelopeFields {
+	return envelopeFields{trustDomainRef, channelRef, 1, 7, 11, "00000000-0000-0000-0000-000000000105", "00000000-0000-0000-0000-000000000104"}
 }
 
 func aesFixture() error {
@@ -76,10 +86,10 @@ func aesFixture() error {
 	}
 	out := make([]byte, len(plain)+gcm.Overhead())
 	tag := out[len(plain):]
-	gcm.Seal(out[:0], nonce, plain, envelopeAAD("00000000-0000-0000-0000-000000000104"))
+	gcm.Seal(out[:0], nonce, plain, canonicalEnvelopeAAD(fixtureFields()))
 	// Seal writes ciphertext and tag together; split the documented framing.
 	ciphertext := out[:len(plain)]
-	result := map[string]any{"nonce": b64(nonce), "ciphertext": b64(ciphertext), "tag": b64(tag), "aad": string(envelopeAAD("00000000-0000-0000-0000-000000000104")), "plaintext": string(plain)}
+	result := map[string]any{"nonce": b64(nonce), "ciphertext": b64(ciphertext), "tag": b64(tag), "aad": string(canonicalEnvelopeAAD(fixtureFields())), "plaintext": string(plain)}
 	return json.NewEncoder(os.Stdout).Encode(result)
 }
 
@@ -88,6 +98,81 @@ type fixtureRecord struct {
 	Ciphertext string `json:"ciphertext"`
 	Tag        string `json:"tag"`
 	AAD        string `json:"aad"`
+}
+
+func aesTamper() error {
+	key := mustHex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+	nonce := mustHex("a0a1a2a3a4a5a6a7a8a9aaab")
+	plain := []byte(`{"fixture":"conveyance-security-interop-v1"}`)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return err
+	}
+	base := fixtureFields()
+	sealed := gcm.Seal(nil, nonce, plain, canonicalEnvelopeAAD(base))
+	ct, tag := sealed[:len(plain)], sealed[len(plain):]
+	checks := []struct {
+		name   string
+		mutate func(envelopeFields, []byte, []byte, []byte) ([]byte, []byte, []byte, []byte)
+	}{
+		{"trust_domain_ref", func(f envelopeFields, n, c, t []byte) ([]byte, []byte, []byte, []byte) {
+			f.TrustDomainRef = "00000000-0000-0000-0000-000000000999"
+			return n, c, t, canonicalEnvelopeAAD(f)
+		}},
+		{"channel_ref", func(f envelopeFields, n, c, t []byte) ([]byte, []byte, []byte, []byte) {
+			f.ChannelRef = "00000000-0000-0000-0000-000000000999"
+			return n, c, t, canonicalEnvelopeAAD(f)
+		}},
+		{"envelope_format_version", func(f envelopeFields, n, c, t []byte) ([]byte, []byte, []byte, []byte) {
+			f.FormatVersion = 2
+			return n, c, t, canonicalEnvelopeAAD(f)
+		}},
+		{"channel_epoch", func(f envelopeFields, n, c, t []byte) ([]byte, []byte, []byte, []byte) {
+			f.ChannelEpoch = 8
+			return n, c, t, canonicalEnvelopeAAD(f)
+		}},
+		{"revision", func(f envelopeFields, n, c, t []byte) ([]byte, []byte, []byte, []byte) {
+			f.Revision = 12
+			return n, c, t, canonicalEnvelopeAAD(f)
+		}},
+		{"envelope_ref", func(f envelopeFields, n, c, t []byte) ([]byte, []byte, []byte, []byte) {
+			f.EnvelopeRef = "00000000-0000-0000-0000-000000000999"
+			return n, c, t, canonicalEnvelopeAAD(f)
+		}},
+		{"previous_envelope_ref", func(f envelopeFields, n, c, t []byte) ([]byte, []byte, []byte, []byte) {
+			f.PreviousEnvelopeRef = "00000000-0000-0000-0000-000000000999"
+			return n, c, t, canonicalEnvelopeAAD(f)
+		}},
+		{"nonce", func(f envelopeFields, n, c, t []byte) ([]byte, []byte, []byte, []byte) {
+			n = append([]byte(nil), n...)
+			n[0] ^= 1
+			return n, c, t, canonicalEnvelopeAAD(f)
+		}},
+		{"ciphertext", func(f envelopeFields, n, c, t []byte) ([]byte, []byte, []byte, []byte) {
+			c = append([]byte(nil), c...)
+			c[0] ^= 1
+			return n, c, t, canonicalEnvelopeAAD(f)
+		}},
+		{"tag", func(f envelopeFields, n, c, t []byte) ([]byte, []byte, []byte, []byte) {
+			t = append([]byte(nil), t...)
+			t[0] ^= 1
+			return n, c, t, canonicalEnvelopeAAD(f)
+		}},
+	}
+	passed := 0
+	for _, check := range checks {
+		n, c, t, aad := check.mutate(base, nonce, ct, tag)
+		opened, openErr := gcm.Open(nil, n, append(append([]byte(nil), c...), t...), aad)
+		if openErr == nil || opened != nil {
+			return fmt.Errorf("tamper accepted: %s", check.name)
+		}
+		passed++
+	}
+	return json.NewEncoder(os.Stdout).Encode(map[string]any{"result": "PASS", "passed": passed, "total": len(checks), "canonical_aad_builder": "PASS"})
 }
 
 func aesOpen(path string) error {
@@ -300,6 +385,8 @@ func main() {
 		p := f.String("input", "", "fixture JSON")
 		f.Parse(os.Args[2:])
 		err = aesOpen(*p)
+	case "aes-tamper":
+		err = aesTamper()
 	case "hpke":
 		err = randomGrant()
 	case "vector":

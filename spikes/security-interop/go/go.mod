@@ -1,3 +1,3 @@
-module github.com/Wiiii90/conveyance/spikes/security-interop/go
+module github.com/wgt-system/conveyance/spikes/security-interop/go
 
 go 1.26
