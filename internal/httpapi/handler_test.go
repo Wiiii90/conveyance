@@ -70,6 +70,32 @@ func TestHandlerRejectsInvalidRoutesAndEnvelopeStructure(t *testing.T) {
 	}
 }
 
+func TestHandlerMapsInvalidPositiveNumberFieldsToInvalidEnvelope(t *testing.T) {
+	repository := openRepository(t)
+	service := currentobject.NewService(repository, currentobject.DefaultMaxPayloadSize)
+	handler := NewHandler(service, currentobject.OperationContext{CanPublish: true})
+	base := `{"envelope_format_version":1,"channel_epoch":1,"revision":1,"envelope_ref":"00000000-0000-0000-0000-000000000003","previous_envelope_ref":null,"protected_payload":"AA=="}`
+	for _, field := range []string{"envelope_format_version", "channel_epoch", "revision"} {
+		body := strings.Replace(base, `"`+field+`":1`, `"`+field+`":0`, 1)
+		assertError(t, request(handler, http.MethodPut, testPath, body), http.StatusBadRequest, "invalid_envelope")
+	}
+}
+
+func TestHandlerRejectsInvalidUint64JSONNumbers(t *testing.T) {
+	repository := openRepository(t)
+	service := currentobject.NewService(repository, currentobject.DefaultMaxPayloadSize)
+	handler := NewHandler(service, currentobject.OperationContext{CanPublish: true})
+	base := `{"envelope_format_version":1,"channel_epoch":1,"revision":1,"envelope_ref":"00000000-0000-0000-0000-000000000003","previous_envelope_ref":null,"protected_payload":"AA=="}`
+	cases := []string{
+		strings.Replace(base, `"channel_epoch":1`, `"channel_epoch":-1`, 1),
+		strings.Replace(base, `"channel_epoch":1`, `"channel_epoch":1.5`, 1),
+		strings.Replace(base, `"channel_epoch":1`, `"channel_epoch":18446744073709551616`, 1),
+	}
+	for _, body := range cases {
+		assertError(t, request(handler, http.MethodPut, testPath, body), http.StatusBadRequest, "invalid_envelope")
+	}
+}
+
 func TestHandlerMapsPermissionsLimitsAndApplicationErrors(t *testing.T) {
 	repository := openRepository(t)
 	service := currentobject.NewService(repository, 1)

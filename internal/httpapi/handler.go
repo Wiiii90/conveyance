@@ -218,6 +218,8 @@ func envelopeJSONFrom(envelope currentobject.Envelope) envelopeJSON {
 func writeApplicationError(response http.ResponseWriter, err error) {
 	status, code := http.StatusServiceUnavailable, "unavailable"
 	switch {
+	case errors.Is(err, currentobject.ErrInvalidEnvelope):
+		status, code = http.StatusBadRequest, "invalid_envelope"
 	case errors.Is(err, currentobject.ErrForbidden):
 		status, code = http.StatusForbidden, "forbidden"
 	case errors.Is(err, currentobject.ErrCurrentObjectNotFound):
