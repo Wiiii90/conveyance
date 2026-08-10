@@ -1,4 +1,5 @@
 /bin/
+/conveyance.db
 *.exe
 *.test
 *.out

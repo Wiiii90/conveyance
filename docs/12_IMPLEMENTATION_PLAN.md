@@ -30,6 +30,11 @@ v0.1.0 is sequenced through these work packages:
    application/persistence integration, local/test authorization adapter, and
    HTTP/integration tests.
 
+Issues #1--#5 implementation scope is completed and accepted for v0.1.0.
+Release hardening is the remaining v0.1.0 gate: packaging/runtime behavior,
+container verification, repository/runtime-file hygiene, documentation
+alignment, regression/dependency verification, and final Control-Plane review.
+
 Issue #4 selects SQLite through `database/sql` with `modernc.org/sqlite` for
 the v0.1.0 server. It is a small single-node durable Current Object store, and
 the driver avoids CGO. Persistence is Conveyance-owned only; there is no shared
@@ -38,6 +43,10 @@ database, ORM, or migration framework in v0.1.0.
 v0.1.0 implements no production authentication or cryptography. It has no
 separate Channel-create endpoint: first publish atomically establishes the
 `current_object` Channel.
+
+Production security and foreign-context vertical integration remain later
+work. Release integration to `main`, tagging, and publication require later
+explicit Control-Plane approval.
 
 ## Issue #2 gate
 

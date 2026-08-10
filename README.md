@@ -27,6 +27,25 @@ offline:
 
 The server cannot read the Vocation payload.
 
+## Current implementation status
+
+The v0.1.0 local/test baseline implements:
+
+- the Go Current Object service;
+- opaque Channel/Envelope transport semantics;
+- SQLite durable current-state persistence;
+- the GET/PUT Current Object HTTP API;
+- atomic compare-and-swap (CAS);
+- an 8 MiB decoded payload default.
+
+This baseline is intentionally local/test-only. The runtime binds to
+`127.0.0.1:8080` and uses the runtime database `conveyance.db`. Its current
+allow-all local/test `OperationContext` is not production authentication.
+Production mTLS, enrollment, revocation, recovery, and payload-protection
+interoperability remain deferred. Conveyance does not itself prove that
+arbitrary uploaded payload bytes are encrypted; client-side protection belongs
+to the later accepted security integration.
+
 ## Direction
 
 Preferred implementation stack: Go.
