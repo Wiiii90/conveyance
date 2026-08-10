@@ -79,12 +79,47 @@
 36. The local/test adapter introduces no mTLS, token, API-key, custom-signature,
     enrollment, or trust-establishment protocol.
 
+## v0.2.0 security interoperability specification gates
+
+These are specification acceptance cases for the executable spike governed by
+ADR-0007 and ADR-0008. They do not authorize production security code.
+
+39. Go uses standard Go 1.26 `crypto/hpke`, the frozen RFC 9180 Base Mode
+    suite (`0x0020`, `0x0001`, `0x0002`), and passes the official selected-suite
+    vectors.
+40. Windows uses a persisted platform installation-authentication credential;
+    an actual TLS 1.3 client-authenticated request to Go succeeds, while an
+    unregistered or mismatched credential is rejected.
+41. A real iPhone .NET runtime uses a Keychain-backed installation identity for
+    an actual client-authenticated request to Go; unregistered credentials are
+    rejected and simulator-only evidence is not accepted.
+42. Windows passes official HPKE vectors, opens Go-produced grants, produces
+    grants opened by Go, and rejects all specified tampering.
+43. A real iPhone passes official HPKE vectors, opens Go-produced grants,
+    produces grants opened by Go, and rejects all specified tampering.
+44. Windows produces byte-identical AES-GCM output for the fixed project
+    fixture, opens Go output, produces output opened by Go, and rejects all
+    specified metadata/nonce/ciphertext/tag tampering.
+45. A real iPhone meets the same AES-GCM fixture, round-trip, and tamper
+    requirements as Windows.
+46. Evidence proves the authentication credential, HPKE credential, and
+    Channel Key are separate, and Conveyance never obtains a Channel Key or
+    private HPKE key.
+47. The spike result is exactly `PASS`, `BLOCKED-HPKE`, `BLOCKED-MTLS-IOS`,
+    `BLOCKED-KEY-STORAGE`, or `BLOCKED-OTHER`, with exact evidence. No partial
+    result is described as production-ready security.
+
+The required Channel Key Grant and Envelope tamper cases, exact AAD/info
+bytes, fixture inputs, and storage evidence are frozen in
+`docs/15_SECURITY_INTEROP_PROFILE.md`. Replay remains governed by ADR-0006;
+checkpoints are not implemented in this specification issue.
+
 ## Deferred security acceptance tests
 
-Production authentication, revocation, Key Grants, payload cryptographic
-verification, rollback checkpoints, and recovery tests remain gated security
-milestone work. They must follow accepted security ADRs and ADR-0007 rather
-than the v0.1.0 local/test authorization adapter.
+Production authentication, enrollment, revocation, Key Grant APIs, payload
+cryptographic integration, rollback checkpoints, and recovery tests remain
+gated security milestone work. They must follow accepted security ADRs and
+ADR-0007/ADR-0008 rather than the v0.1.0 local/test authorization adapter.
 
 ## Availability tests
 

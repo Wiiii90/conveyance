@@ -31,9 +31,9 @@ v0.1.0 is sequenced through these work packages:
    HTTP/integration tests.
 
 Issues #1--#5 implementation scope is completed and accepted for v0.1.0.
-Release hardening is the remaining v0.1.0 gate: packaging/runtime behavior,
-container verification, repository/runtime-file hygiene, documentation
-alignment, regression/dependency verification, and final Control-Plane review.
+v0.1.0 is released and tag `v0.1.0` exists. It is not pending release
+hardening; later work must not reinterpret the v0.1 baseline as an unfinished
+release gate.
 
 Issue #4 selects SQLite through `database/sql` with `modernc.org/sqlite` for
 the v0.1.0 server. It is a small single-node durable Current Object store, and
@@ -54,6 +54,21 @@ Issues #3--#5 must implement, not redesign, the contract frozen in ADR-0003 and
 `docs/08_CONTRACTS.md`. Any contradiction or missing architecture decision
 returns to the Control Plane before code changes.
 
+## v0.2.0 -- security interoperability proof
+
+The v0.2.0 sequence is:
+
+1. Freeze the security interoperability profile/specification in ADR-0008 and
+   `docs/15_SECURITY_INTEROP_PROFILE.md`.
+2. Execute the Go + Windows interoperability spike.
+3. Execute the real-iPhone interoperability gate on a physical target.
+4. Return the exact evidence to the Control Plane for review.
+5. Only after `PASS`, decide and freeze the scope of production security
+   implementation.
+
+Production enrollment, recovery, revocation, and payload-encryption
+implementation are not scheduled before the interoperability result.
+
 ## Later security integration
 
 A future Control-Plane-assigned milestone may implement accepted TLS/client
@@ -61,10 +76,10 @@ authentication integration, installation credential lifecycle, Channel
 grants, opaque Channel Key Grants, revocation enforcement, recovery-package
 persistence, and client interoperability.
 
-Before any production security claim, execute ADR-0007 as a narrow technical
-spike on the actual .NET Windows/iPhone and Go runtimes. If HPKE or mTLS cannot
-be made reliable, stop and return to the Control Plane. Do not invent a custom
-cryptographic or authentication protocol.
+Before any production security claim, execute the v0.2.0 profile as a narrow
+technical spike on the actual .NET Windows/iPhone and Go runtimes. If HPKE or
+mTLS cannot be made reliable, stop and return to the Control Plane. Do not
+invent a custom cryptographic or authentication protocol.
 
 ## Later foreign-context vertical proof
 
