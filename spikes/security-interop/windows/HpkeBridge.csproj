@@ -7,6 +7,6 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="HpkeBridge.cs" />
+    <Compile Remove="Program.cs" />
   </ItemGroup>
 </Project>

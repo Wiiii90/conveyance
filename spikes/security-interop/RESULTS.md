@@ -78,14 +78,14 @@ is explicitly rejected.
 The official OpenSSL 3.5.7 source archive and published SHA-256 were
 verified. The public `openssl/hpke.h` header contains the frozen RFC 9180
 suite identifiers and the required context, key, encapsulation, seal/open,
-and suite-check operations. The x64 MSVC, nmake, and suitable Perl tools were
-available, but configuration stopped because NASM was not installed or
-discoverable. Candidate result: `BLOCKED-OPENSSL-BUILD-ENVIRONMENT`.
+and suite-check operations. The normal x64 build produced static `libcrypto`;
+the candidate result is `OPENSSL-HPKE-WINDOWS-PASS`.
 
-No native library, C shim, .NET P/Invoke harness, RFC vector run, Go↔OpenSSL
-interop, or native tamper suite is claimed. The detailed provenance and
-static iOS audit are in `native/RESULTS.md`. This does not alter the prior
-AES or `BLOCKED-MTLS-WINDOWS-ENVIRONMENT` evidence.
+The public-API C shim and .NET 10 P/Invoke proof passed the selected RFC
+vector, native random/tamper proof, both Go↔OpenSSL grant directions, and the
+six-case grant tamper suite. Detailed provenance, key-storage observations,
+and the static iOS audit are in `native/RESULTS.md`. Prior AES and
+`BLOCKED-MTLS-WINDOWS-ENVIRONMENT` evidence is unchanged.
 
 ### BouncyCastle.Cryptography 2.6.2
 

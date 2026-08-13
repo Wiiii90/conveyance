@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$SourceRoot = '',
-    [switch]$DownloadOfficialSource
+    [switch]$DownloadOfficialSource,
+    [switch]$RunBridgeProof
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,11 +35,26 @@ if (-not (Test-Path -LiteralPath (Join-Path $source 'include\openssl\hpke.h'))) 
 }
 
 $nasm = Get-Command nasm.exe -ErrorAction SilentlyContinue
+if ($null -eq $nasm -and (Test-Path -LiteralPath 'C:\Program Files\NASM\nasm.exe')) {
+    $nasm = Get-Item -LiteralPath 'C:\Program Files\NASM\nasm.exe'
+}
 if ($null -eq $nasm) {
     Write-Output 'Stage: BLOCKED-OPENSSL-BUILD-ENVIRONMENT'
     Write-Output 'Missing prerequisite: NASM (not installed or discoverable)'
     exit 0
 }
 
-Write-Output "NASM: $($nasm.Source)"
-Write-Output 'All discovery gates passed; native build and bridge harness are not included in this run.'
+Write-Output "NASM: $($nasm.FullName)"
+$nativeRoot = Join-Path $PSScriptRoot 'openssl'
+$output = Join-Path $SourceRoot 'shim'
+& (Join-Path $nativeRoot 'build-windows.ps1') -OpenSslRoot $source -OutputDirectory $output
+if ($LASTEXITCODE -ne 0) { throw 'Native shim build failed' }
+Write-Output 'OpenSSL build and native shim: PASS'
+if ($RunBridgeProof) {
+    $project = Join-Path $PSScriptRoot '..\windows\HpkeBridge.csproj'
+    dotnet build $project --nologo
+    if ($LASTEXITCODE -ne 0) { throw '.NET HPKE bridge build failed' }
+    $managed = Join-Path (Split-Path $project) 'bin\Debug\net10.0-windows\HpkeBridge.dll'
+    & dotnet $managed (Join-Path $output 'conveyance_hpke.dll') proof
+    if ($LASTEXITCODE -ne 0) { throw 'Native/.NET proof failed' }
+}

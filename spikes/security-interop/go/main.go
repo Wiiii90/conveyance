@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdh"
@@ -42,6 +43,13 @@ type grant struct {
 	RecipientInstallationRef string `json:"recipient_installation_ref"`
 	Enc                      string `json:"enc"`
 	Ciphertext               string `json:"ciphertext"`
+	RecipientPrivateKey      string `json:"-"`
+	RecipientPublicKey       string `json:"-"`
+}
+
+type grantEnvelope struct {
+	Grant               grant  `json:"grant"`
+	RecipientPrivateKey string `json:"recipient_private_key"`
 }
 
 func mustHex(s string) []byte {
@@ -218,7 +226,7 @@ func randomGrant() error {
 	if err != nil {
 		return err
 	}
-	g := grant{1, int(kem.ID()), int(kdf.ID()), int(aead.ID()), trustDomainRef, channelRef, 7, installRef, "", ""}
+	g := grant{GrantFormatVersion: 1, KEMID: int(kem.ID()), KDFID: int(kdf.ID()), AEADID: int(aead.ID()), TrustDomainRef: trustDomainRef, ChannelRef: channelRef, ChannelEpoch: 7, RecipientInstallationRef: installRef}
 	enc, sender, err := hpke.NewSender(recipient.PublicKey(), kdf, aead, []byte("conveyance/channel-key-grant/1.0"))
 	if err != nil {
 		return err
@@ -229,6 +237,11 @@ func randomGrant() error {
 		return err
 	}
 	g.Enc, g.Ciphertext = b64(enc), b64(ct)
+	recipientPrivate, err := recipient.Bytes()
+	if err != nil {
+		return err
+	}
+	g.RecipientPrivateKey, g.RecipientPublicKey = b64(recipientPrivate), b64(recipient.PublicKey().Bytes())
 	r, err := hpke.NewRecipient(enc, recipient, kdf, aead, []byte("conveyance/channel-key-grant/1.0"))
 	if err != nil {
 		return err
@@ -245,7 +258,106 @@ func randomGrant() error {
 	if _, err = r.Open(grantAAD(tamper), ct); err == nil {
 		return errors.New("tampered grant AAD was accepted")
 	}
-	return json.NewEncoder(os.Stdout).Encode(map[string]any{"grant": g, "round_trip": "PASS", "tamper": "PASS", "recipient_public_key": b64(recipient.PublicKey().Bytes())})
+	return json.NewEncoder(os.Stdout).Encode(map[string]any{"grant": g, "round_trip": "PASS", "tamper": "PASS", "recipient_public_key": b64(recipient.PublicKey().Bytes()), "recipient_private_key": b64(recipientPrivate)})
+}
+
+func openGrant(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var envelope grantEnvelope
+	if err = json.Unmarshal(data, &envelope); err != nil {
+		return err
+	}
+	g := envelope.Grant
+	privBytes, err := unb64(envelope.RecipientPrivateKey)
+	if err != nil {
+		return err
+	}
+	enc, err := unb64(g.Enc)
+	if err != nil {
+		return err
+	}
+	ct, err := unb64(g.Ciphertext)
+	if err != nil {
+		return err
+	}
+	kem := hpke.DHKEM(ecdh.X25519())
+	priv, err := kem.NewPrivateKey(privBytes)
+	if err != nil {
+		return err
+	}
+	r, err := hpke.NewRecipient(enc, priv, hpke.HKDFSHA256(), hpke.AES256GCM(), []byte("conveyance/channel-key-grant/1.0"))
+	if err != nil {
+		return err
+	}
+	opened, err := r.Open(grantAAD(g), ct)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(opened, mustHex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")) {
+		return errors.New("grant Channel Key mismatch")
+	}
+	return json.NewEncoder(os.Stdout).Encode(map[string]any{"result": "PASS"})
+}
+
+func grantTamper(path string) error {
+	original, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var envelope grantEnvelope
+	if err = json.Unmarshal(original, &envelope); err != nil {
+		return err
+	}
+	g := envelope.Grant
+	mutations := []string{"grant_format_version", "kem_id", "kdf_id", "aead_id", "trust_domain_ref", "channel_ref"}
+	for _, mutation := range mutations {
+		candidate := g
+		switch mutation {
+		case "grant_format_version":
+			candidate.GrantFormatVersion = 2
+		case "kem_id":
+			candidate.KEMID = 33
+		case "kdf_id":
+			candidate.KDFID = 2
+		case "aead_id":
+			candidate.AEADID = 1
+		case "trust_domain_ref":
+			candidate.TrustDomainRef = "00000000-0000-0000-0000-000000000199"
+		case "channel_ref":
+			candidate.ChannelRef = "00000000-0000-0000-0000-000000000199"
+		}
+		privBytes, decodeErr := unb64(envelope.RecipientPrivateKey)
+		if decodeErr != nil {
+			return decodeErr
+		}
+		enc, decodeErr := unb64(candidate.Enc)
+		if decodeErr != nil {
+			return decodeErr
+		}
+		ct, decodeErr := unb64(candidate.Ciphertext)
+		if decodeErr != nil {
+			return decodeErr
+		}
+		if candidate.GrantFormatVersion != 1 || candidate.KEMID != 32 || candidate.KDFID != 1 || candidate.AEADID != 2 {
+			continue
+		}
+		kem := hpke.DHKEM(ecdh.X25519())
+		priv, keyErr := kem.NewPrivateKey(privBytes)
+		if keyErr != nil {
+			return keyErr
+		}
+		r, recipientErr := hpke.NewRecipient(enc, priv, hpke.HKDFSHA256(), hpke.AES256GCM(), []byte("conveyance/channel-key-grant/1.0"))
+		if recipientErr != nil {
+			return recipientErr
+		}
+		if _, openErr := r.Open(grantAAD(candidate), ct); openErr == nil {
+			return fmt.Errorf("tamper accepted: %s", mutation)
+		}
+	}
+	return json.NewEncoder(os.Stdout).Encode(map[string]any{"result": "PASS", "passed": len(mutations)})
 }
 
 func vectorCheck() error {
@@ -391,6 +503,18 @@ func main() {
 		err = randomGrant()
 	case "vector":
 		err = vectorCheck()
+	case "open-grant":
+		if len(os.Args) != 3 {
+			fmt.Fprintln(os.Stderr, "usage: open-grant path")
+			os.Exit(2)
+		}
+		err = openGrant(os.Args[2])
+	case "grant-tamper":
+		if len(os.Args) != 3 {
+			fmt.Fprintln(os.Stderr, "usage: grant-tamper path")
+			os.Exit(2)
+		}
+		err = grantTamper(os.Args[2])
 	case "make-server":
 		f := flag.NewFlagSet("make-server", flag.ExitOnError)
 		c := f.String("cert", "", "certificate PEM")
