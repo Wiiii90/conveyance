@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Wiiii90/conveyance/internal/currentobject"
+	"github.com/wgt-system/conveyance/internal/currentobject"
 )
 
 type Handler struct {

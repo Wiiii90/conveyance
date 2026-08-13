@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Wiiii90/conveyance/internal/currentobject"
-	"github.com/Wiiii90/conveyance/internal/persistence/sqlite"
+	"github.com/wgt-system/conveyance/internal/currentobject"
+	"github.com/wgt-system/conveyance/internal/persistence/sqlite"
 )
 
 const testPath = "/v1/trust-domains/00000000-0000-0000-0000-000000000001/channels/00000000-0000-0000-0000-000000000002/current"

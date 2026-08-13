@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Wiiii90/conveyance/internal/currentobject"
+	"github.com/wgt-system/conveyance/internal/currentobject"
 	_ "modernc.org/sqlite"
 )
 

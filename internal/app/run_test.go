@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Wiiii90/conveyance/internal/currentobject"
+	"github.com/wgt-system/conveyance/internal/currentobject"
 )
 
 type observedContext struct {

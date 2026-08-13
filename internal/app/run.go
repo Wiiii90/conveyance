@@ -6,9 +6,9 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/Wiiii90/conveyance/internal/currentobject"
-	"github.com/Wiiii90/conveyance/internal/httpapi"
-	"github.com/Wiiii90/conveyance/internal/persistence/sqlite"
+	"github.com/wgt-system/conveyance/internal/currentobject"
+	"github.com/wgt-system/conveyance/internal/httpapi"
+	"github.com/wgt-system/conveyance/internal/persistence/sqlite"
 )
 
 type config struct {

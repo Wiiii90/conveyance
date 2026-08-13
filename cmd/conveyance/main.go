@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Wiiii90/conveyance/internal/app"
+	"github.com/wgt-system/conveyance/internal/app"
 )
 
 func main() {

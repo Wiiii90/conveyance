@@ -1,4 +1,4 @@
-module github.com/Wiiii90/conveyance
+module github.com/wgt-system/conveyance
 
 go 1.26
 
