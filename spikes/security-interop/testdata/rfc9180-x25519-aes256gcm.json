@@ -1,5 +1,5 @@
 {
-  "provenance": "RFC 9180 test material as supplied by Go 1.26.5 standard-library crypto/hpke tests",
+  "provenance": "Copied from Go 1.26.5 standard-library testdata/rfc9180.json, mode 0 / KEM 0x0020 / KDF 0x0001 / AEAD 0x0002 entry. This is RFC 9180-derived test material in Go's conformance corpus, not an RFC 9180 Appendix A frozen-suite vector.",
   "mode": 0,
   "kem_id": 32,
   "kdf_id": 1,

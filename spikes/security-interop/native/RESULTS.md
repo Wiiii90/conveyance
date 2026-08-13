@@ -45,12 +45,19 @@ HKDF-SHA256 `0x0001`, and AES-256-GCM `0x0002`.
 - .NET 10 P/Invoke: PASS; run-scoped resolver loads the shim and no C# crypto
   construction is used.
 - Native random round-trip: PASS.
-- Selected RFC 9180 vector: PASS, including exact encapsulated key and raw
-  32-byte X25519 public-key derivation.
+- RFC 9180 algorithm/suite conformance: PASS for the public Base-mode API and
+  frozen identifiers. This is separate from the deterministic fixture below.
+- Deterministic fixture: PASS, including exact encapsulated key and raw
+  32-byte X25519 public-key derivation. The values are copied from the
+  Go 1.26.5 standard-library `crypto/hpke/testdata/rfc9180.json` entry for
+  mode 0/KEM 0x0020/KDF 0x0001/AEAD 0x0002. RFC 9180 Appendix A does not
+  define this frozen AES-256-GCM combination; Appendix A.1 is AES-128-GCM.
 - Failed AAD open: PASS; safe error, zero output length, and cleared plaintext.
 - Go -> .NET/OpenSSL grant: PASS.
 - .NET/OpenSSL -> Go grant: PASS.
-- Grant tamper suite: `6/6 PASS` in both directions.
+- Grant tamper suite: exactly `6/6 PASS` in both directions: `trust_domain_ref`,
+  `channel_ref`, `channel_epoch`, `recipient_installation_ref`, `enc`, and
+  `ciphertext/tag`.
 - Private material: the spike passes raw 32-byte private material through
   managed arrays for this proof; native temporary buffers are cleared on
   failure. Platform-protected/non-exportable HPKE persistence remains

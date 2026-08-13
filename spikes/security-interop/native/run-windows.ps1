@@ -19,8 +19,10 @@ $source = Join-Path $SourceRoot 'openssl-3.5.7'
 New-Item -ItemType Directory -Force -Path $SourceRoot | Out-Null
 if ($DownloadOfficialSource) {
     Invoke-WebRequest -Uri $officialUrl -OutFile $archive
-    $published = (Invoke-WebRequest -Uri $checksumUrl).Content.Trim()
-    $published | Set-Content -LiteralPath (Join-Path $SourceRoot 'openssl-3.5.7.tar.gz.sha256') -NoNewline
+    $checksumFile = Join-Path $SourceRoot 'openssl-3.5.7.tar.gz.sha256'
+    Invoke-WebRequest -Uri $checksumUrl -OutFile $checksumFile
+    $published = Get-Content -LiteralPath $checksumFile -Raw
+    if ([string]::IsNullOrWhiteSpace($published)) { throw 'Official checksum file was empty' }
 }
 if (-not (Test-Path -LiteralPath $archive)) { throw "Missing official archive: $archive" }
 $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -45,6 +47,12 @@ if ($null -eq $nasm) {
 }
 
 Write-Output "NASM: $($nasm.FullName)"
+$vs = 'C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat'
+$perl = 'C:\Program Files\MATLAB\R2023a\sys\perl\win32\bin\perl.exe'
+if (-not (Test-Path -LiteralPath (Join-Path $source 'libcrypto.lib'))) {
+    cmd /c "set `"PATH=C:\Program Files\NASM;%PATH%`" && call `"$vs`" -arch=x64 && cd /d `"$source`" && `"$perl`" Configure VC-WIN64A no-shared no-tests && nmake"
+    if ($LASTEXITCODE -ne 0) { throw 'OpenSSL Configure/nmake failed' }
+}
 $nativeRoot = Join-Path $PSScriptRoot 'openssl'
 $output = Join-Path $SourceRoot 'shim'
 & (Join-Path $nativeRoot 'build-windows.ps1') -OpenSslRoot $source -OutputDirectory $output
@@ -57,4 +65,34 @@ if ($RunBridgeProof) {
     $managed = Join-Path (Split-Path $project) 'bin\Debug\net10.0-windows\HpkeBridge.dll'
     & dotnet $managed (Join-Path $output 'conveyance_hpke.dll') proof
     if ($LASTEXITCODE -ne 0) { throw 'Native/.NET proof failed' }
+
+    $go = (Get-Command go.exe -ErrorAction Stop).Source
+    $goDir = Join-Path $PSScriptRoot '..\go'
+    $env:GOCACHE = Join-Path $SourceRoot 'go-cache'
+    $env:GOMODCACHE = Join-Path $SourceRoot 'go-mod'
+    $env:GOPATH = Join-Path $SourceRoot 'go-path'
+    $goBinary = Join-Path $SourceRoot 'security-interop-go.exe'
+    & $go -C $goDir build -buildvcs=false -o $goBinary .
+    if ($LASTEXITCODE -ne 0) { throw 'Go spike build failed' }
+
+    $goWrapperPath = Join-Path $SourceRoot 'go-wrapper.json'
+    $goGrantPath = Join-Path $SourceRoot 'go-grant.json'
+    & $goBinary hpke | Set-Content -LiteralPath $goWrapperPath
+    if ($LASTEXITCODE -ne 0) { throw 'Go grant generation failed' }
+    $goWrapper = Get-Content -LiteralPath $goWrapperPath -Raw | ConvertFrom-Json
+    [pscustomobject]@{ grant = $goWrapper.grant; recipient_private_key = $goWrapper.recipient_private_key; recipient_public_key = $goWrapper.recipient_public_key } |
+        ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $goGrantPath
+    & dotnet $managed (Join-Path $output 'conveyance_hpke.dll') open-grant $goGrantPath
+    if ($LASTEXITCODE -ne 0) { throw 'Go-to-OpenSSL grant proof failed' }
+    & dotnet $managed (Join-Path $output 'conveyance_hpke.dll') grant-tamper $goGrantPath
+    if ($LASTEXITCODE -ne 0) { throw 'OpenSSL recipient tamper proof failed' }
+
+    $opensslGrantPath = Join-Path $SourceRoot 'openssl-grant.json'
+    & dotnet $managed (Join-Path $output 'conveyance_hpke.dll') grant $opensslGrantPath
+    if ($LASTEXITCODE -ne 0) { throw 'OpenSSL grant generation failed' }
+    & $goBinary open-grant $opensslGrantPath
+    if ($LASTEXITCODE -ne 0) { throw 'OpenSSL-to-Go grant proof failed' }
+    & $goBinary grant-tamper $opensslGrantPath
+    if ($LASTEXITCODE -ne 0) { throw 'Go recipient tamper proof failed' }
+    Write-Output 'Grant interop and exact six-case tamper proof: PASS both directions'
 }

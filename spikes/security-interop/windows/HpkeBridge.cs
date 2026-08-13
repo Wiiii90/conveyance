@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 internal static class HpkeNative
 {
@@ -55,7 +56,7 @@ internal static class HpkeProgram
         {
             if (args.Length < 2) throw new ArgumentException("usage: HpkeBridge <native.dll> <proof|grant> [path]");
             HpkeNative.Load(Path.GetFullPath(args[0]));
-            return args[1] switch { "proof" => Proof(), "grant" => Grant(args), "open-grant" => OpenGrant(args), _ => throw new ArgumentException("unknown command") };
+            return args[1] switch { "proof" => Proof(), "grant" => Grant(args), "open-grant" => OpenGrant(args), "grant-tamper" => GrantTamper(args), _ => throw new ArgumentException("unknown command") };
         }
         catch (Exception ex) { Console.Error.WriteLine($"{ex.GetType().Name}: {ex.Message}"); return 1; }
     }
@@ -77,7 +78,7 @@ internal static class HpkeProgram
         var tampered = Encoding.UTF8.GetBytes("bad-aad"); var failed = new byte[random.Ciphertext.Length - 16]; nuint failedLen = (nuint)failed.Length;
         var code = HpkeNative.conveyance_hpke_open(randomSk, 32, Info, (nuint)Info.Length, tampered, (nuint)tampered.Length, random.Enc, (nuint)random.Enc.Length, random.Ciphertext, (nuint)random.Ciphertext.Length, failed, ref failedLen);
         if (code == 0 || failedLen != 0 || failed.Any(x => x != 0)) throw new InvalidOperationException("AAD tamper was accepted or plaintext leaked");
-        Console.WriteLine(JsonSerializer.Serialize(new { suite_check = "PASS", rfc_vector = "PASS", random_round_trip = "PASS", aad_tamper = "PASS", derived_private_key_bytes = derivedSk.Length })); return 0;
+        Console.WriteLine(JsonSerializer.Serialize(new { suite_check = "PASS", rfc9180_algorithm_conformance = "PASS", frozen_suite_deterministic_proof = "PASS", random_round_trip = "PASS", aad_tamper = "PASS", derived_private_key_bytes = derivedSk.Length })); return 0;
     }
 
     static int Grant(string[] args)
@@ -100,5 +101,31 @@ internal static class HpkeProgram
         var opened = Open(sk, Info, aad, enc, ct); var expected = Convert.FromHexString("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f");
         if (!opened.SequenceEqual(expected)) throw new InvalidOperationException("grant Channel Key mismatch");
         Console.WriteLine("PASS"); return 0;
+    }
+
+    static int GrantTamper(string[] args)
+    {
+        if (args.Length != 3) throw new ArgumentException("grant-tamper requires an input JSON path");
+        var original = File.ReadAllText(args[2]);
+        var mutations = new[] { "trust_domain_ref", "channel_ref", "channel_epoch", "recipient_installation_ref", "enc", "ciphertext/tag" };
+        foreach (var mutation in mutations)
+        {
+            var root = JsonNode.Parse(original)!.AsObject(); var grant = root["grant"]!.AsObject();
+            var sk = Convert.FromBase64String(root["recipient_private_key"]!.GetValue<string>());
+            var enc = Convert.FromBase64String(grant["enc"]!.GetValue<string>()); var ct = Convert.FromBase64String(grant["ciphertext"]!.GetValue<string>());
+            switch (mutation)
+            {
+                case "trust_domain_ref": grant["trust_domain_ref"] = "00000000-0000-0000-0000-000000000199"; break;
+                case "channel_ref": grant["channel_ref"] = "00000000-0000-0000-0000-000000000199"; break;
+                case "channel_epoch": grant["channel_epoch"] = grant["channel_epoch"]!.GetValue<ulong>() + 1; break;
+                case "recipient_installation_ref": grant["recipient_installation_ref"] = "00000000-0000-0000-0000-000000000199"; break;
+                case "enc": enc[0] ^= 1; break;
+                case "ciphertext/tag": ct[^1] ^= 1; break;
+            }
+            var aad = Encoding.UTF8.GetBytes(A(grant["trust_domain_ref"]!.GetValue<string>(), grant["channel_ref"]!.GetValue<string>(), grant["channel_epoch"]!.GetValue<ulong>(), grant["recipient_installation_ref"]!.GetValue<string>()));
+            try { _ = Open(sk, Info, aad, enc, ct); throw new InvalidOperationException($"tamper accepted: {mutation}"); }
+            catch (InvalidOperationException ex) when (ex.Message.StartsWith("open failed:")) { }
+        }
+        Console.WriteLine(JsonSerializer.Serialize(new { result = "PASS", passed = mutations.Length, cases = mutations })); return 0;
     }
 }

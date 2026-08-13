@@ -33,8 +33,13 @@ is explicitly rejected.
 - Frozen suite: DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-256-GCM.
 - Normal HPKE Channel Key Grant round trip: `PASS`.
 - Grant AAD tamper rejection: `PASS`.
-- Selected Go 1.26.5 standard-library vector material: recipient key and
-  encapsulation material parse/validate, `PASS`.
+- Go 1.26.5 `crypto/hpke/testdata/rfc9180.json` entry for mode 0/KEM 0x0020/
+  KDF 0x0001/AEAD 0x0002 is the exact provenance of the deterministic
+  material. It is RFC 9180-derived corpus material, not an RFC Appendix A
+  vector: Appendix A.1 uses AES-128-GCM and does not define this frozen
+  AES-256-GCM combination.
+- RFC 9180 algorithm/suite conformance and the frozen-suite deterministic
+  cross-runtime proof are reported separately in the native results.
 - Same-suite caller-supplied info/AAD round trip: `PASS`.
 - The installed standard-library testdata is compact and stores accumulated
   values. Its deterministic sender test hook is internal; the public API does
@@ -81,10 +86,14 @@ suite identifiers and the required context, key, encapsulation, seal/open,
 and suite-check operations. The normal x64 build produced static `libcrypto`;
 the candidate result is `OPENSSL-HPKE-WINDOWS-PASS`.
 
-The public-API C shim and .NET 10 P/Invoke proof passed the selected RFC
-vector, native random/tamper proof, both Go↔OpenSSL grant directions, and the
-six-case grant tamper suite. Detailed provenance, key-storage observations,
-and the static iOS audit are in `native/RESULTS.md`. Prior AES and
+The public-API C shim and .NET 10 P/Invoke proof passed RFC 9180
+algorithm/suite conformance plus the separate Go-derived frozen-suite
+deterministic proof, native random/tamper proof, both Go↔OpenSSL grant
+directions, and exactly these six tamper cases in both directions:
+`trust_domain_ref`, `channel_ref`, `channel_epoch`,
+`recipient_installation_ref`, `enc`, and `ciphertext/tag`. Detailed
+provenance, key-storage observations, and the static iOS audit are in
+`native/RESULTS.md`. Prior AES and
 `BLOCKED-MTLS-WINDOWS-ENVIRONMENT` evidence is unchanged.
 
 ### BouncyCastle.Cryptography 2.6.2
