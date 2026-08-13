@@ -79,7 +79,8 @@ try {
         $unknownResult = $LASTEXITCODE
         & $dotnet $dll request $run registered (Join-Path $run 'server.pem.der') $url '00000000-0000-0000-0000-000000000999'
         $mismatch = $LASTEXITCODE
-        $mTlsStatus = "no_certificate=$noCert; registered=$positive; unknown=$unknownResult; mismatched_installation_ref=$mismatch; tls=TLS1.3; unknown_credential_created=$unknown"
+        $serverTlsError = if (Test-Path $serverErr) { (Get-Content $serverErr -Raw).Trim() } else { 'none' }
+        $mTlsStatus = "WINDOWS-MTLS-PASS; no_certificate=$noCert; registered=$positive; unknown=$unknownResult; mismatched_installation_ref=$mismatch; tls=TLS1.3; unknown_credential_created=$unknown; server_error=$serverTlsError"
     } else {
         $mTlsStatus = 'BLOCKED-MTLS-WINDOWS-ENVIRONMENT: persisted credential creation unavailable'
     }

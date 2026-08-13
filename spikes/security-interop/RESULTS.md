@@ -8,13 +8,12 @@ Canonical spike Go module: `github.com/wgt-system/conveyance/spikes/security-int
 This is empirical spike evidence only. It is not ADR-0007 `PASS` or
 production-security approval. Current sub-gates are: Windows HPKE
 `OPENSSL-HPKE-WINDOWS-PASS`, Windows AES `AES-WINDOWS-INTEROP-PASS`, Windows
-mTLS `BLOCKED-MTLS-WINDOWS-ENVIRONMENT`, and real iPhone `OUTSTANDING`.
+mTLS `WINDOWS-MTLS-PASS`, and real iPhone `OUTSTANDING`.
 
 ## Current status
 
-Windows HPKE and AES evidence pass. Windows mTLS remains blocked by the host
-credential-store environment, and real-iPhone interoperability remains
-outstanding. The overall spike is therefore not ADR-0007 `PASS`.
+Windows HPKE, AES, and mTLS evidence pass. Real-iPhone interoperability
+remains outstanding, so the overall spike is not ADR-0007 `PASS`.
 
 The earlier managed-only candidate rejection is historical evidence and is
 superseded by the accepted OpenSSL native bridge evidence below. Homemade
@@ -54,26 +53,33 @@ ECDH+HKDF+AES remains explicitly rejected.
 - Implementation uses .NET 10 `CngKey.Create` with ECDSA P-256, the Microsoft
   Software Key Storage Provider, a unique persisted key name, signing usage,
   and `CngExportPolicies.None`.
-- Certificate profile: self-signed test X.509 v3, SHA-256, Digital Signature,
-  TLS Web Client Authentication EKU `1.3.6.1.5.5.7.3.2`; public certificate
-  only is written to the run directory.
-- Diagnostic result: ephemeral ECDSA P-256 CNG creation and signing `PASS`.
-- Microsoft Software Key Storage Provider is the selected provider, but the
-  minimal uniquely named persisted CurrentUser key creation fails:
-  `System.Security.Cryptography.CryptographicException`, HRESULT
-  `0x80070002`, message `The system cannot find the file specified.`
-- The first failure is persisted minimal key creation. Persisted signing,
-  persisted `CngExportPolicies.None`, and separate-process reopen are
-  `NOT-RUN` because no persisted key exists. The diagnostic cleanup is
-  run-scoped and idempotent.
-- mTLS sub-gate: `BLOCKED-MTLS-WINDOWS-ENVIRONMENT`. This is host/store access
-  evidence, not an architectural mTLS failure. The client code does not fall
-  back to an exportable or in-memory credential.
-- Because persisted credential creation did not become executable, no-client,
-  registered, unknown-certificate, mismatched-InstallationRef, and negotiated
-  TLS 1.3 request cases are `NOT-RUN` in this environment. The harness now
-  contains all four request paths and will execute them if the diagnostic
-  prerequisite passes.
+- Certificate profile: self-signed test X.509 v3 trust anchor, SHA-256,
+  Digital Signature, explicit CA basic constraints for the loopback trust
+  anchor, and TLS Web Client Authentication EKU `1.3.6.1.5.5.7.3.2`; public
+  certificate only is written to the run directory.
+- Diagnostic result: persisted ECDSA P-256 creation, signing,
+  `CngExportPolicies.None` non-exportability, and separate-process reopen/sign
+  `PASS`. The reopen bug was a null provider caused by serializing an
+  anonymous record that did not deserialize into `DiagnosticKey`.
+- TLS root causes were the same diagnostic class of harness issue: server
+  certificate validity was compared across local/UTC `DateTime` kinds, and the
+  self-signed client certificate was not marked as the explicit CA trust
+  anchor used by the loopback Go verifier. The harness now normalizes validity
+  checks to UTC and uses the normal TLS 1.3/X.509 trust path.
+- mTLS sub-gate: `WINDOWS-MTLS-PASS`. The client uses the persisted named CNG
+  key from `CurrentUser\My`; no private-key export or fallback credential is
+  used. The self-signed client certificate is an explicit CA trust anchor for
+  the loopback Go server and retains the client-authentication EKU.
+- Four request cases: no client certificate rejected during TLS setup;
+  registered certificate succeeds with HTTP 200; unknown certificate rejected
+  during TLS setup; registered certificate with wrong InstallationRef reaches
+  the server and returns HTTP 403. All requests use TLS 1.3.
+- Focused runner result: `WINDOWS-MTLS-PASS`; the server-side diagnostic
+  records expected TLS alerts for the no-certificate and unknown-certificate
+  cases, while the registered certificate completes the handshake.
+- TLS diagnostics record client inner exceptions and server-side handshake
+  errors without weakening certificate validation. Server validation remains
+  strict on validity and pinned SPKI.
 - Server implementation is loopback-only, TLS 1.3-only, requires a client
   certificate, pins the test server SPKI in the client, and checks the explicit
   InstallationRef mapping. No trust-all callback or production CA is used.
@@ -96,7 +102,9 @@ directions, and exactly these six tamper cases in both directions:
 `recipient_installation_ref`, `enc`, and `ciphertext/tag`. Detailed
 provenance, key-storage observations, and the static iOS audit are in
 `native/RESULTS.md`. Prior AES and
-`BLOCKED-MTLS-WINDOWS-ENVIRONMENT` evidence is unchanged.
+The earlier `BLOCKED-MTLS-WINDOWS-ENVIRONMENT` result is retained as the
+historical pre-fix diagnosis; the current Windows mTLS sub-gate is
+`WINDOWS-MTLS-PASS`.
 
 ### BouncyCastle.Cryptography 2.6.2
 
