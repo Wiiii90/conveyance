@@ -35,7 +35,7 @@ try {
     $vectorGo = (& $goBin vector | Out-String | ConvertFrom-Json)
     $aesTamperGo = (& $goBin aes-tamper | Out-String | ConvertFrom-Json)
     if ($hpkeGo.round_trip -ne 'PASS' -or $hpkeGo.tamper -ne 'PASS') { throw 'Go HPKE checks failed' }
-    if ($vectorGo.selected_vector_material -ne 'PASS' -or $vectorGo.aad_round_trip -ne 'PASS') { throw 'Go vector checks failed' }
+    if ($vectorGo.rfc9180_algorithm_conformance -ne 'PASS' -or $vectorGo.frozen_suite_deterministic_proof -ne 'PASS' -or $vectorGo.aad_round_trip -ne 'PASS') { throw 'Go vector checks failed' }
     if ($aesTamperGo.result -ne 'PASS' -or $aesTamperGo.passed -ne 10) { throw 'Go AES tamper checks failed' }
 
     & $dotnet $dll aes-fixture $run | Out-Null
@@ -84,12 +84,11 @@ try {
         $mTlsStatus = 'BLOCKED-MTLS-WINDOWS-ENVIRONMENT: persisted credential creation unavailable'
     }
 
-    $stage = 'BLOCKED-HPKE'
+    $stage = 'WINDOWS-HPKE-AES-PASS'
     $summary = [ordered]@{
         stage = $stage; go = (& $go version); dotnet = (& $dotnet --version)
-        go_hpke = $hpkeGo; go_vector = $vectorGo; aes = 'AES-WINDOWS-INTEROP-PASS'; go_aes_tamper = $aesTamperGo; windows_aes_tamper = $aesTamperWindows; canonical_fixture = 'PASS'; mtls = $mTlsStatus
+        hpke_windows = 'OPENSSL-HPKE-WINDOWS-PASS'; go_hpke = $hpkeGo; go_vector = $vectorGo; aes = 'AES-WINDOWS-INTEROP-PASS'; go_aes_tamper = $aesTamperGo; windows_aes_tamper = $aesTamperWindows; canonical_fixture = 'PASS'; mtls = $mTlsStatus
         cng_diagnostic = $diagnostic; cng_reopen = $diagnosticReopen
-        hpke_candidate = 'BLOCKED: no acceptable managed C# RFC 9180 candidate identified'
         real_iphone = 'OUTSTANDING'; cleanup = 'finally block removes run-scoped directory'
     }
     $summary | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $run 'summary.json')

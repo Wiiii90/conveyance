@@ -5,18 +5,20 @@ Run date: 2026-08-10
 Canonical repository: `wgt-system/conveyance`.
 Canonical spike Go module: `github.com/wgt-system/conveyance/spikes/security-interop/go`.
 
-This is empirical spike evidence only. It is not ADR-0007 `PASS`, not
-production-security approval, and does not prove the real-iPhone gate.
+This is empirical spike evidence only. It is not ADR-0007 `PASS` or
+production-security approval. Current sub-gates are: Windows HPKE
+`OPENSSL-HPKE-WINDOWS-PASS`, Windows AES `AES-WINDOWS-INTEROP-PASS`, Windows
+mTLS `BLOCKED-MTLS-WINDOWS-ENVIRONMENT`, and real iPhone `OUTSTANDING`.
 
-## Stage conclusion
+## Current status
 
-`BLOCKED-HPKE`
+Windows HPKE and AES evidence pass. Windows mTLS remains blocked by the host
+credential-store environment, and real-iPhone interoperability remains
+outstanding. The overall spike is therefore not ADR-0007 `PASS`.
 
-No acceptable maintained managed C# implementation of RFC 9180 HPKE with the
-frozen Base-mode X25519/HKDF-SHA256/AES-256-GCM suite was identified. No native
-bridge was created. The next permitted step is Control-Plane review and a
-later narrowly scoped candidate/bridge investigation; homemade ECDH+HKDF+AES
-is explicitly rejected.
+The earlier managed-only candidate rejection is historical evidence and is
+superseded by the accepted OpenSSL native bridge evidence below. Homemade
+ECDH+HKDF+AES remains explicitly rejected.
 
 ## Toolchains
 
@@ -143,8 +145,8 @@ AES stage: `AES-WINDOWS-INTEROP-PASS`.
 
 - Generated credentials/server keys are run-scoped and ignored; cleanup is in
   the orchestrator `finally` block.
-- Full `run-windows.ps1`: `PASS` as a reproducible run, with stage
-  classification `BLOCKED-HPKE`; its temporary directory was removed.
+- Full `run-windows.ps1`: `PASS` as a reproducible run, with current stage
+  `WINDOWS-HPKE-AES-PASS`; its temporary directory was removed.
 - `gofmt` verification: `PASS`.
 - Go spike `go test ./...`: `PASS`.
 - Go spike `go build -buildvcs=false`: `PASS`.
