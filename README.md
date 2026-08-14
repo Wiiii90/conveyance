@@ -41,10 +41,16 @@ The v0.1.0 local/test baseline implements:
 This baseline is intentionally local/test-only. The runtime binds to
 `127.0.0.1:8080` and uses the runtime database `conveyance.db`. Its current
 allow-all local/test `OperationContext` is not production authentication.
-Production mTLS, enrollment, revocation, recovery, and payload-protection
-interoperability remain deferred. Conveyance does not itself prove that
-arbitrary uploaded payload bytes are encrypted; client-side protection belongs
-to the later accepted security integration.
+The Go and Windows evidence for the frozen ADR-0007 security-interoperability
+path is complete. The remaining gate is the physical real-iPhone proof:
+Keychain-backed installation authentication, TLS 1.3 mTLS rejection cases,
+HPKE Go↔iPhone interoperability and tamper rejection, and the frozen
+AES-256-GCM Envelope fixture and tamper cases. Issue #6 remains open; a
+simulator or Windows iOS build is not a substitute. Production mTLS,
+enrollment, revocation, recovery, and payload-protection integration remain
+deferred, and no production-security claim is made. Conveyance does not
+itself prove that arbitrary uploaded payload bytes are encrypted; client-side
+protection belongs to the accepted security integration.
 
 ## Direction
 

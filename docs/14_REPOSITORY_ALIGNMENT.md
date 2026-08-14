@@ -1,6 +1,6 @@
 # 14 – Repository Alignment Review
 
-Reviewed against current `dev` state on 2026-08-09.
+Reviewed against current `dev` state on 2026-08-14.
 
 ## Wiiii Got This
 
@@ -67,4 +67,4 @@ The generic Channel and per-Channel key/epoch model is compatible with future Il
 
 No cross-context ownership conflict blocks Conveyance.
 
-The only implementation-blocking uncertainty found is concrete security interoperability across Go and WGT .NET/iOS. ADR-0007 turns that uncertainty into an explicit pre-production gate rather than an implicit assumption.
+The only implementation-blocking uncertainty found is the physical iPhone portion of concrete security interoperability. Go and Windows evidence is complete; Issue #6 remains open for the real .NET/iOS target and its Keychain, mTLS, HPKE, AES-GCM, and tamper cases. ADR-0007 remains an explicit pre-production gate: no partial result is production-ready security.

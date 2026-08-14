@@ -6,6 +6,14 @@ Accepted architecture baseline for specification-first Conveyance V1.
 
 Production security implementation remains gated by the interoperability proof in ADR-0007.
 
+The current evidence status is partial and not production-ready: the frozen
+Go and Windows interoperability evidence is complete, while the physical
+real-iPhone gate remains open under Issue #6. The iPhone gate must prove
+Keychain-backed installation authentication, TLS 1.3 mTLS rejection cases,
+HPKE Go↔iPhone interoperability and tamper rejection, and the frozen
+AES-256-GCM Envelope fixture and tamper cases. A simulator or Windows iOS
+build does not satisfy this gate.
+
 ## Runtime
 
 Preferred server stack:

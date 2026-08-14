@@ -36,6 +36,12 @@ Before implementation:
 5. identify contradictions before editing code;
 6. do not infer domain ownership from deployment topology or implementation convenience.
 
+## WGT System Architecture
+
+The system-level architecture source of truth is `wgt-system/architecture`. Before changing generic delivery, cross-context integration, or another system-wide capability, consult its Capability Catalog and Integration Policy.
+
+Conveyance is the accepted owner of generic durable opaque cross-device delivery. It must not acquire foreign publication, command, authority, merge, conflict, reconciliation, or business-object semantics. If a required generic delivery mode is missing or materially insufficient, return the requirement to the System Architecture Control Plane rather than creating a competing subsystem. Runtime code must not depend on the architecture repository.
+
 ## Boundary rules
 
 Conveyance owns generic delivery semantics only.
