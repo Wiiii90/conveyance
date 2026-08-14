@@ -11,7 +11,13 @@ Verified architectural facts:
 - Device identity, installation identity, cryptographic credentials, enrollment and revocation are conceptually distinct;
 - hybrid recovery is accepted;
 - server control alone must not become trust authority;
-- exact crypto/key hierarchy was intentionally deferred to the first concrete synchronized flow.
+- WGT Personal Device Trust and Hybrid Recovery semantics are accepted;
+- Conveyance's v0.2 Security Interoperability Profile is concrete and frozen for the
+  interoperability proof;
+- Go/Windows evidence is complete, while the physical iPhone proof remains open;
+- Issue #6 remains the readiness gate and ADR-0007 remains the pre-production gate;
+- production enrollment/revocation/recovery, payload integration, and other production-only
+  security details remain gated; no Production Security approval is claimed.
 
 Conveyance alignment:
 
