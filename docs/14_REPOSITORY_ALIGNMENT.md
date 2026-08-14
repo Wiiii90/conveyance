@@ -19,15 +19,14 @@ Conveyance alignment:
 - it does not import WGT `DeviceIdentity` or `ServiceIntegration`;
 - Channel authorization is a generic delivery ACL, not WGT Capability Resolution.
 
-Known WGT documentation drift to synchronize separately:
+Current WGT alignment:
 
-- `docs/23_FOREIGN_CONTEXT_ALIGNMENT.md` still describes the old Vocation mobile read-model direction and says no production WGT read contract exists;
-- `docs/22_DEFERRED_DECISIONS.md` still treats the first Vocation WGT contract as future work;
-- `docs/10_ARCHITECTURE.md` contains stale Vocation-readiness text and older “still required” architecture decisions;
-- README contains an old specification-only status section above the accepted/implemented bootstrap baseline;
-- ADR-0002 still predicts Illumination as the likely first concrete synchronized flow.
+- WGT identifies Conveyance as the accepted owner of generic durable opaque delivery and
+  retains device/platform integration and presentation ownership;
+- Vocation `Published Opportunity Overview 1.0` is implemented and consumed by WGT Windows;
+- WGT's remaining provider/runtime readiness gates are separate from Conveyance ownership.
 
-These are documentation synchronization items, not Conveyance domain changes.
+No active WGT documentation drift relevant to Conveyance remains from the reviewed findings.
 
 ## Vocation
 
@@ -42,9 +41,9 @@ Verified:
 
 Conveyance does not expose or interpret Vocation `publication_ref`, Opportunities, Companies, Postings, personal state, Freshness, or Availability.
 
-Known Vocation documentation drift:
-
-ADR-0010 says Relay/Storage “is not a Sync bounded context” and that no separate Sync bounded context is introduced. This must be clarified to mean only that **Vocation does not introduce or own one**. System-wide, Conveyance is the separately accepted Synchronization/Relay bounded context.
+ADR-0010 now preserves Vocation's local authority while describing Conveyance as the
+separately accepted generic Synchronization/Relay bounded context. No current Vocation
+alignment finding remains.
 
 ## Illumination
 
@@ -54,14 +53,19 @@ Verified:
 - WGT is the primary Windows/iPhone presentation;
 - future iPhone use with the PC off requires a device-local copy of learning data needed for study;
 - remote readable learning persistence is not assumed;
-- Illumination owns future domain-specific change, merge, conflict, scheduling and reconciliation semantics;
-- generic infrastructure may own relay/transport/retry/encryption.
+- Illumination owns future domain-specific publication, change, command, authority, merge,
+  conflict, scheduling and reconciliation semantics;
+- WGT owns device/platform integration and presentation;
+- Conveyance owns generic durable opaque cross-device delivery.
 
 Conveyance alignment:
 
 The generic Channel and per-Channel key/epoch model is compatible with future Illumination synchronization without defining its payload/change contract today.
 
-`Current Object` remains the only Conveyance V1 delivery mode. Illumination may later justify an ordered/change delivery mode through a separate contract decision.
+`Current Object` remains the only accepted Conveyance V1 delivery mode; it is not an
+automatically accepted bidirectional Learning synchronization solution. Illumination may
+later justify an ordered/change delivery mode only through a separate domain contract and
+system architecture decision.
 
 ## Review result
 
