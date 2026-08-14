@@ -2,7 +2,7 @@
 
 Date: 2026-08-10  
 Repository: `wgt-system/conveyance`  
-Worktree: `P:\conveyance\.worktrees\dev`  
+Worktree: `P:\wgt-system\conveyance\.worktrees\dev`  
 Branch: `dev`  
 Expected HEAD before this candidate: `48c9fdc3882e518c70c7869c98eb1ff09defcc46`
 

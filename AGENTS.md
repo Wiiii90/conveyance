@@ -10,10 +10,10 @@ Do not use “Relay Service” as the project name. Relay is a technical/domain 
 
 The canonical worktrees are:
 
-- `P:\conveyance` -> `main` -> stable release state;
-- `P:\conveyance\.worktrees\dev` -> `dev` -> active development.
+- `P:\wgt-system\conveyance` -> `main` -> stable release state;
+- `P:\wgt-system\conveyance\.worktrees\dev` -> `dev` -> active development.
 
-Implementation workers use `P:\conveyance\.worktrees\dev` unless explicitly instructed otherwise. The `main` worktree is not used for ordinary implementation. Release integration to `main` occurs only on explicit Control-Plane instruction.
+Implementation workers use `P:\wgt-system\conveyance\.worktrees\dev` unless explicitly instructed otherwise. The `main` worktree is not used for ordinary implementation. Release integration to `main` occurs only on explicit Control-Plane instruction.
 
 Before editing, workers verify the repository root, branch, and expected HEAD.
 
